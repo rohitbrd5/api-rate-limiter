@@ -11,6 +11,11 @@ rate-limit:
   default-limit: 60
   default-window: seconds
 
+  # Inactive client cleanup configuration
+  cleanup:
+    idle-timeout: 50   # 50 milliseconds for faster tests
+    sweep-interval: 60000   # 1 minute (in milliseconds)
+
   # Per-client rate limit configurations
   clients:
     customerA:
@@ -26,6 +31,10 @@ rate-limit:
       limit: 5
       windowType: seconds
     customerD:
+      limit: 5
+      windowType: seconds
+    # Client for testing rate limit exhaustion (low limit so sequential requests can exhaust it)
+    exhaustTestClient:
       limit: 5
       windowType: seconds
 

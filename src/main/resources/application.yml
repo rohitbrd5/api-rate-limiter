@@ -10,6 +10,10 @@ rate-limit:
   # Default limits for unknown clients
   default-limit: 60
   default-window: seconds
+  # Inactive client cleanup configuration
+  cleanup:
+      idle-timeout: 300000   # 5 minutes (in milliseconds)
+      sweep-interval: 60000   # 1 minute (in milliseconds)
 
   # Per-client rate limit configurations
   clients:
@@ -48,3 +52,5 @@ logging:
     com.example.ratelimiter: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+  

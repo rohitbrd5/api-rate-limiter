@@ -27,6 +27,9 @@ public class ClientRateLimiter {
     /** Timestamp (in nanoseconds) when tokens were last refilled */
     private volatile long lastRefillNanos;
 
+    /** Timestamp (in nanoseconds) of the last access (used for idle cleanup) */
+    private volatile long lastAccessNanos;
+
     /**
      * Create a new client rate limiter with the given configuration.
      *
@@ -36,6 +39,7 @@ public class ClientRateLimiter {
         this.config = new AtomicReference<>(initialConfig);
         this.availableTokens = new java.util.concurrent.atomic.AtomicLong(initialConfig.getLimit());
         this.lastRefillNanos = System.nanoTime();
+        this.lastAccessNanos = System.nanoTime();
     }
 
     /**
@@ -55,6 +59,9 @@ public class ClientRateLimiter {
 
         // Refill tokens based on time elapsed
         refillTokens(currentConfig, now);
+
+        // Update last access time for idle cleanup tracking (before attempting acquire)
+        lastAccessNanos = now;
 
         // Try to consume one token
         long current;
@@ -151,5 +158,23 @@ public class ClientRateLimiter {
      */
     public long getConfigAsNanos() {
         return lastRefillNanos;
+    }
+
+    /**
+     * Get the last access time in nanoseconds. Used by the cleanup scheduler.
+     *
+     * @return last access time in nanoseconds
+     */
+    public long getLastAccessNanos() {
+        return lastAccessNanos;
+    }
+
+    /**
+     * Set the last access time in nanoseconds. Used for testing cleanup scheduler.
+     *
+     * @param lastAccessNanos the last access time to set
+     */
+    public void setLastAccessNanos(long lastAccessNanos) {
+        this.lastAccessNanos = lastAccessNanos;
     }
 }

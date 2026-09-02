@@ -5,7 +5,10 @@ import com.example.ratelimiter.model.ClientLimitConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Service-level rate limiter that manages per-client rate limiters.
@@ -93,5 +96,56 @@ public class RateLimiterService {
                 (int) remaining,
                 estimatedResetSeconds
         );
+    }
+
+    /**
+     * Clean up inactive client limiters based on idle timeout.
+     * Removes ClientRateLimiter instances that haven't been accessed for longer than the configured idleTimeout.
+     *
+     * @param now current time in nanoseconds
+     */
+    public void cleanupInactiveLimiters(long now) {
+        long idleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(rateLimiterConfig.getIdleTimeout());
+        Iterator<Map.Entry<String, ClientRateLimiter>> iterator = clientLimiters.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<String, ClientRateLimiter> entry = iterator.next();
+            ClientRateLimiter limiter = entry.getValue();
+
+            long lastAccessNanos = limiter.getLastAccessNanos();
+            long timeSinceLastAccessNanos = now - lastAccessNanos;
+
+            if (timeSinceLastAccessNanos > idleTimeoutNanos) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /**
+     * Get the current number of active client limiters.
+     *
+     * @return count of active client limiters
+     */
+    public int getActiveClientCount() {
+        return clientLimiters.size();
+    }
+
+    /**
+     * Get the ClientRateLimiter for a specific client (package-private for testing).
+     *
+     * @param clientId the client identifier
+     * @return the ClientRateLimiter, or null if not found
+     */
+    public ClientRateLimiter getClientLimiter(String clientId) {
+        return clientLimiters.get(clientId);
+    }
+
+    /**
+     * Get the map of all client limiters (package-private for testing).
+     *
+     * @return the map of client limiters
+     */
+    public Map<String, ClientRateLimiter> getClientLimiters() {
+        return clientLimiters;
     }
 }

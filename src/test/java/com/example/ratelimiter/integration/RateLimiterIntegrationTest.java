@@ -1,5 +1,10 @@
 package com.example.ratelimiter.integration;
 
+import com.example.ratelimiter.config.RateLimiterConfiguration;
+import com.example.ratelimiter.model.ClientLimitConfig;
+import com.example.ratelimiter.model.WindowType;
+import com.example.ratelimiter.service.ClientRateLimiter;
+import com.example.ratelimiter.service.RateLimiterService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,6 +12,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -23,6 +31,9 @@ class RateLimiterIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private RateLimiterConfiguration rateLimiterConfig;
+
   
     @Test
     @DisplayName("should return 200 OK for first request")
@@ -36,9 +47,10 @@ class RateLimiterIntegrationTest {
     }
 
     @Test
-    @DisplayName("should return 429 after exhausting customerD limit of 5")
+    @DisplayName("should return 429 after exhausting rate limit")
     void checkEndpoint_returns429WhenLimitExhausted() throws Exception {
-        String clientId = "customerD";
+        // exhaustTestClient has limit=5/second, so sequential requests can exhaust it.
+        String clientId = "exhaustTestClient";
 
         // Exhaust limit (5 requests)
         for (int i = 0; i < 5; i++) {
@@ -55,10 +67,13 @@ class RateLimiterIntegrationTest {
     @Test
     @DisplayName("should isolate rate limits between clients")
     void checkEndpoint_isolatesBetweenClients() throws Exception {
-        String clientA = "customerD";
-        String clientB = "clientB-" + System.currentTimeMillis();
+        // Use burstClient (limit=5/second) for clientA to make exhaustion test fast.
+        // burstClient is already configured with limit=5 in test application.yml.
+        // clientB uses the default limit (60/sec) and is a separate limiter.
+        String clientA = "burstClient";
+        String clientB = "isolatedClientB-" + System.nanoTime();
 
-        // Exhaust clientA
+        // Exhaust clientA (5 requests)
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(get("/api/ratelimit/{clientA}/check", clientA))
                     .andExpect(status().isOk());
@@ -68,7 +83,7 @@ class RateLimiterIntegrationTest {
         mockMvc.perform(get("/api/ratelimit/{clientA}/check", clientA))
                 .andExpect(status().isTooManyRequests());
 
-        // clientB should still work
+        // clientB should still work (separate limiter with default limit)
         mockMvc.perform(get("/api/ratelimit/{clientB}/check", clientB))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.allowed").value(true));
@@ -141,5 +156,50 @@ class RateLimiterIntegrationTest {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    @DisplayName("should clean up inactive clients based on idle timeout")
+    void cleanupInactiveClients_removesClientsExceedingIdleTimeout() {
+        // First, get the RateLimiterService from the application context
+        RateLimiterService rateLimiterService = getRateLimiterService();
+
+        // Add an old client whose last access is well past the idle timeout
+        String oldClientId = "old-client-" + System.currentTimeMillis();
+        rateLimiterService.allowRequest(oldClientId);
+        ClientRateLimiter oldLimiter = rateLimiterService.getClientLimiter(oldClientId);
+        // Set last access to 200ms ago (well beyond the 50ms test timeout)
+        long now = System.nanoTime();
+        oldLimiter.setLastAccessNanos(now - TimeUnit.MILLISECONDS.toNanos(200));
+
+        // Add a recent client
+        String recentClientId = "recent-client-" + System.currentTimeMillis();
+        rateLimiterService.allowRequest(recentClientId);
+        ClientRateLimiter recentLimiter = rateLimiterService.getClientLimiter(recentClientId);
+        recentLimiter.setLastAccessNanos(now);
+
+        // Sanity: both clients are in the map before cleanup
+        assertTrue(rateLimiterService.getClientLimiters().containsKey(oldClientId),
+                "Old client should be present before cleanup");
+        assertTrue(rateLimiterService.getClientLimiters().containsKey(recentClientId),
+                "Recent client should be present before cleanup");
+
+        // Run cleanup with current time
+        rateLimiterService.cleanupInactiveLimiters(now);
+
+        // The old client should have been removed
+        assertFalse(rateLimiterService.getClientLimiters().containsKey(oldClientId),
+                "Old client should have been removed from the map");
+
+        // The recent client should still be present
+        assertTrue(rateLimiterService.getClientLimiters().containsKey(recentClientId),
+                "Recent client should still be present after cleanup");
+    }
+
+    /**
+     * Helper to get the RateLimiterService from the application context.
+     */
+    private RateLimiterService getRateLimiterService() {
+        return ApplicationContextProvider.getBean(RateLimiterService.class);
     }
 }
