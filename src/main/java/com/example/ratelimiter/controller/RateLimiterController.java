@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.ratelimiter.exception.RateLimitExceededException;
 import com.example.ratelimiter.service.RateLimitStatus;
 import com.example.ratelimiter.service.RateLimiterService;
 
@@ -42,9 +43,11 @@ public class RateLimiterController {
     @GetMapping("/{clientId}/check")
     public ResponseEntity<AllowRequestResponse> checkRequest(@PathVariable String clientId) {
         boolean allowed = rateLimiterService.allowRequest(clientId);
+        if (!allowed) {
+            throw new RateLimitExceededException(clientId);
+        }
         AllowRequestResponse response = new AllowRequestResponse(allowed, clientId);
-        return ResponseEntity.status(allowed ? HttpStatus.OK : HttpStatus.TOO_MANY_REQUESTS)
-                .body(response);
+        return ResponseEntity.ok(response);
     }
 
     /**

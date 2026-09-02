@@ -113,10 +113,9 @@ public class RateLimiterService {
             ClientRateLimiter limiter = entry.getValue();
 
             long lastAccessNanos = limiter.getLastAccessNanos();
-            long timeSinceLastAccessNanos = now - lastAccessNanos;
 
-            if (timeSinceLastAccessNanos > idleTimeoutNanos) {
-                iterator.remove();
+            if (now - lastAccessNanos > idleTimeoutNanos) {
+            	clientLimiters.remove(entry.getKey(), limiter);
             }
         }
     }

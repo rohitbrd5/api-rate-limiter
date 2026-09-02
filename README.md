@@ -185,7 +185,7 @@ Spring Boot Actuator health endpoint.
 
 **`GET /swagger-ui.html`**
 
-Interactive API documentation.
+Interactive API documentation [Swagger UI Dashboard](http://localhost:8080/swagger-ui.html)
 
 ---
 
@@ -295,6 +295,12 @@ java -jar target/api-rate-limiter-1.0.0.jar --server.port=9090
 ```
 
 ---
+
+- **Inactive Client Cleanup**: Automatically runs a scheduled task to sweep and remove inactive client rate limiters from memory. 
+- **Configurable Intervals**: Manage execution frequency and idle timeouts using the `rate-.cleanup.*` properties.
+```
+
+
 
 ## Future Enhancements
 

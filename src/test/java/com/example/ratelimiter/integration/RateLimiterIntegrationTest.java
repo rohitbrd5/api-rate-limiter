@@ -58,10 +58,12 @@ class RateLimiterIntegrationTest {
                     .andExpect(status().isOk());
         }
 
-        // Next request should be rate limited
+        // Next request should be rate limited and handled by GlobalExceptionHandler
         mockMvc.perform(get("/api/ratelimit/{clientId}/check", clientId))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.allowed").value(false));
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.error").value("Too Many Requests"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(clientId)));
     }
 
     @Test
@@ -81,7 +83,9 @@ class RateLimiterIntegrationTest {
 
         // clientA should be rate limited
         mockMvc.perform(get("/api/ratelimit/{clientA}/check", clientA))
-                .andExpect(status().isTooManyRequests());
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.error").value("Too Many Requests"));
 
         // clientB should still work (separate limiter with default limit)
         mockMvc.perform(get("/api/ratelimit/{clientB}/check", clientB))
@@ -100,7 +104,8 @@ class RateLimiterIntegrationTest {
 
         // 101st should be rate limited
         mockMvc.perform(get("/api/ratelimit/customerA/check"))
-                .andExpect(status().isTooManyRequests());
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.status").value(429));
     }
 
     @Test
@@ -114,7 +119,8 @@ class RateLimiterIntegrationTest {
 
         // 11th should be rate limited
         mockMvc.perform(get("/api/ratelimit/customerC/check"))
-                .andExpect(status().isTooManyRequests());
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.status").value(429));
     }
 
    
@@ -201,5 +207,24 @@ class RateLimiterIntegrationTest {
      */
     private RateLimiterService getRateLimiterService() {
         return ApplicationContextProvider.getBean(RateLimiterService.class);
+    }
+
+    @Test
+    @DisplayName("GlobalExceptionHandler should return structured error for 429")
+    void globalExceptionHandler_returnsStructuredErrorFor429() throws Exception {
+        String clientId = "errorTestClient";
+
+        // Exhaust limit (5 requests)
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(get("/api/ratelimit/{clientId}/check", clientId))
+                    .andExpect(status().isOk());
+        }
+
+        // Verify error response structure
+        mockMvc.perform(get("/api/ratelimit/{clientId}/check", clientId))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.error").value("Too Many Requests"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(clientId)));
     }
 }

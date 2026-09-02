@@ -1,5 +1,6 @@
 package com.example.ratelimiter.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
  * and removes clients that haven't been accessed for longer than the
  * configured idle timeout ({@code rate-limit.cleanup.idle-timeout}).
  */
+@Slf4j
 @Component
 public class InactiveClientCleanupTask {
 
@@ -35,8 +37,6 @@ public class InactiveClientCleanupTask {
         int afterCount = rateLimiterService.getActiveClientCount();
         int removed = beforeCount - afterCount;
 
-        if (removed > 0) {
-            // Could log removal count here if needed
-        }
+        log.info("Inactive client cleanup completed. Removed {} inactive client(s)", removed);
     }
 }
