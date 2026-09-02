@@ -1,6 +1,12 @@
 # API Rate Limiter
 
-A thread-safe, per-client API rate limiting microservice built with Spring Boot 3.2. Uses the **Token Bucket** algorithm with configurable limits per client, supporting per-second, per-minute, and per-hour windows.
+- **Token Bucket per Client** : Each client gets its own ClientRateLimiter instance with configurable
+  limits (limit + window), stored in an in-memory ConcurrentHashMap.
+- **Lazy Token Refill**: Tokens are refilled lazily on each request (not on a timer) — when allowRequest()  is called, it first replenishes tokens based on elapsed time, then checks if one is available.        
+- **Cleanup of Inactive Clients**: A scheduled task (InactiveClientCleanupTask) runs periodically and     
+  removes client limiters that haven't been accessed for longer than the configured idle timeout,       
+  keeping memory bounded.Manage execution frequency and idle timeouts using the `rate-.cleanup.*`   properties.
+- **Global Exception Handling**: When a request is denied, RateLimitExceededException is thrown and caught  by GlobalExceptionHandler, returning a structured HTTP 429 response with logging.
 
 ## Overview
 
@@ -101,6 +107,11 @@ rate-limit:
   # Default limits for unknown clients
   default-limit: 60
   default-window: seconds
+  
+  # Inactive client cleanup configuration
+  cleanup:
+      idle-timeout: 300000   # 5 minutes (in milliseconds)
+      sweep-interval: 60000   # 1 minute (in milliseconds)
 
   # Per-client rate limit configurations
   clients:
@@ -296,8 +307,6 @@ java -jar target/api-rate-limiter-1.0.0.jar --server.port=9090
 
 ---
 
-- **Inactive Client Cleanup**: Automatically runs a scheduled task to sweep and remove inactive client rate limiters from memory. 
-- **Configurable Intervals**: Manage execution frequency and idle timeouts using the `rate-.cleanup.*` properties.
 ```
 
 
