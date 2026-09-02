@@ -1,0 +1,50 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-rate-limiter
+
+# Rate Limiting Configuration
+rate-limit:
+  # Default limits for unknown clients
+  default-limit: 60
+  default-window: seconds
+
+  # Per-client rate limit configurations
+  clients:
+    customerA:
+      limit: 100
+      windowType: minutes
+    customerB:
+      limit: 1000
+      windowType: minutes
+    customerC:
+      limit: 10
+      windowType: seconds
+    burstClient:
+      limit: 5
+      windowType: seconds
+
+# Spring Boot Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# Swagger/OpenAPI configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.example.ratelimiter: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

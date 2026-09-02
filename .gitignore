@@ -1,0 +1,10 @@
+.claude/
+SPEC.md
+target/
+.classpath
+.project
+.settings/
+.idea/
+*.log
+bin/
+.git/

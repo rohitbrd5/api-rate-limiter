@@ -1,0 +1,48 @@
+server:
+  port: 0  # Random port for tests
+
+spring:
+  application:
+    name: api-rate-limiter-test
+
+# Rate Limiting Configuration (for tests)
+rate-limit:
+  # Default limits for unknown clients
+  default-limit: 60
+  default-window: seconds
+
+  # Per-client rate limit configurations
+  clients:
+    customerA:
+      limit: 100
+      windowType: minutes
+    customerB:
+      limit: 1000
+      windowType: minutes
+    customerC:
+      limit: 10
+      windowType: seconds
+    burstClient:
+      limit: 5
+      windowType: seconds
+    customerD:
+      limit: 5
+      windowType: seconds
+
+# Spring Boot Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# Swagger/OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.example.ratelimiter: WARN  # Reduce log noise in tests
